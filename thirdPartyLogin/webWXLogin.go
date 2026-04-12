@@ -1,0 +1,136 @@
+package thirdPartyLogin
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-gonic/gin"
+	"github.com/golgys0621/lgystool/gmd5"
+	"github.com/golgys0621/lgystool/random"
+)
+
+type WebWXLogin struct {
+	AppId       string
+	AppSecret   string
+	RedirectURI string
+	StatePrefix string
+}
+
+type WebWXToken struct {
+	AccessToken string `json:"access_token"`
+	Openid      string `json:"openid"`
+	Unionid     string `json:"unionid"`
+	Errcode     int    `json:"errcode"`
+}
+
+type WebWXUserInfo struct {
+	HeadImgUrl string `json:"headimgurl"`
+	Openid     string `json:"openid"`
+	Unionid    string `json:"unionid"`
+	Nickname   string `json:"nickname"`
+	Errcode    int    `json:"errcode"`
+}
+
+// 授权后返回处理
+func (m *WebWXLogin) Back(ctx *gin.Context, session sessions.Session) (WebWXUserInfo, error) {
+	webWXUserInfo := WebWXUserInfo{}
+	// 检查返回数据
+	code := ctx.Query("code")
+	if code == "" {
+		return webWXUserInfo, errors.New("登陆数据错误")
+	}
+	state := ctx.Query("state")
+	if state == "" {
+		return webWXUserInfo, errors.New("登陆数据错误")
+	}
+	// 检查 state
+	stateInSession := session.Get("WebWXLoginStateCode")
+	if stateInSession != state {
+		return webWXUserInfo, errors.New("登陆状态数据错误")
+	}
+	// 通过 code 获取access_token
+	params := url.Values{}
+	params.Add("grant_type", "authorization_code")
+	params.Add("appid", m.AppId)
+	params.Add("secret", m.AppSecret)
+	params.Add("code", code)
+	params.Add("redirect_uri", m.RedirectURI)
+	loginURL := fmt.Sprintf("%s?%s", "https://api.weixin.qq.com/sns/oauth2/access_token", params.Encode())
+	response, err := http.Get(loginURL)
+	if err != nil {
+		return webWXUserInfo, err
+	}
+	defer response.Body.Close()
+	bs, _ := io.ReadAll(response.Body)
+	// 成功
+	// {
+	// "access_token":"ACCESS_TOKEN",
+	// "expires_in":7200,
+	// "refresh_token":"REFRESH_TOKEN",
+	// "openid":"OPENID",
+	// "scope":"SCOPE",
+	// "unionid": "o6_bmasdasdsad6_2sgVt7hMZOPfL"
+	// }
+	// 失败 {"errcode":40001, "errmsg":"***" }
+	webWXToken := &WebWXToken{}
+	err = json.Unmarshal(bs, webWXToken)
+	if err != nil {
+		return webWXUserInfo, err
+	}
+	if webWXToken.Errcode > 0 {
+		return webWXUserInfo, errors.New("登录失败 Error_100006")
+	}
+
+	// 通过access_token调用接口 获取用户个人信息
+	params2 := url.Values{}
+	params2.Add("access_token", webWXToken.AccessToken)
+	params2.Add("openid", webWXToken.Openid)
+	loginURL = fmt.Sprintf("%s?%s", "https://api.weixin.qq.com/sns/userinfo", params2.Encode())
+	// https://api.weixin.qq.com/sns/userinfo?access_token=***&openid=***
+	response2, err := http.Get(loginURL)
+	if err != nil {
+		return webWXUserInfo, err
+	}
+	defer response2.Body.Close()
+	bs2, _ := io.ReadAll(response2.Body)
+	// 成功 {
+	// "openid":"***",
+	// "nickname":"***",
+	// "sex":0,
+	// "headimgurl":"http...",
+	// "unionid":"******"
+	//}
+	// 失败 {"errcode":40001, "errmsg":"***" }
+	err = json.Unmarshal(bs2, &webWXUserInfo)
+	if err != nil {
+		return webWXUserInfo, err
+	}
+	if webWXUserInfo.Errcode > 0 {
+		return webWXUserInfo, errors.New("登录失败 Error_100008")
+	}
+	return webWXUserInfo, nil
+}
+
+// 跳转到微信扫码登陆
+func (m *WebWXLogin) Login(ctx *gin.Context, session sessions.Session) {
+	// 组合 url
+	params := url.Values{}
+	params.Add("response_type", "code")
+	params.Add("appid", m.AppId)
+	params.Add("scope", "snsapi_login")
+	// 生成随机码
+	randCode := gmd5.Md5(m.StatePrefix + random.UUID())
+	// 利用 session 记录 state
+	session.Set("WebWXLoginStateCode", randCode)
+	session.Save()
+	params.Add("state", randCode)
+	str := fmt.Sprintf("%s&redirect_uri=%s", params.Encode(), m.RedirectURI)
+	loginURL := fmt.Sprintf("%s?%s", "https://open.weixin.qq.com/connect/qrconnect", str)
+	// 重定向到 微信互联
+	ctx.Redirect(302, loginURL)
+}
