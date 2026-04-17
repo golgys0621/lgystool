@@ -66,9 +66,9 @@ func Start(dbConfigs map[string]map[string]string) {
 			}
 			GoToolDBMap[k], err = gorm.Open(mysql.Open(DSN), options)
 			if err != nil {
-				log.Println("✘ 连接库连接池 : " + k + " 初始化失败 ( " + err.Error() + " )")
+				log.Println("✘ MySQL连接库连接池 : " + k + " 初始化失败 ( " + err.Error() + " )")
 			} else {
-				log.Println("✔ 连接库连接池 : " + k + " 初始化成功 ")
+				log.Println("✔ MySQL连接库连接池 : " + k + " 初始化成功 ")
 			}
 		// MSSQL
 		case "MSSQL":
@@ -85,9 +85,9 @@ func Start(dbConfigs map[string]map[string]string) {
 			}
 			GoToolDBMap[k], err = gorm.Open(sqlserver.Open(DSN), options)
 			if err != nil {
-				log.Println("✘ 连接库连接池 : " + k + " 初始化失败 ( " + err.Error() + " )")
+				log.Println("✘ MSSQL连接库连接池 : " + k + " 初始化失败 ( " + err.Error() + " )")
 			} else {
-				log.Println("✔ 连接库连接池 : " + k + " 初始化成功 ")
+				log.Println("✔ MSSQL连接库连接池 : " + k + " 初始化成功 ")
 			}
 		// PostgreSQL
 		case "PostgreSQL":
@@ -98,18 +98,18 @@ func Start(dbConfigs map[string]map[string]string) {
 			}
 			GoToolDBMap[k], err = gorm.Open(postgres.Open(DSN), options)
 			if err != nil {
-				log.Println("✘ 连接库连接池 : " + k + " 初始化失败 ( " + err.Error() + " )")
+				log.Println("✘ PostgreSQL连接库连接池 : " + k + " 初始化失败 ( " + err.Error() + " )")
 			} else {
-				log.Println("✔ 连接库连接池 : " + k + " 初始化成功 ")
+				log.Println("✔ PostgreSQL连接库连接池 : " + k + " 初始化成功 ")
 			}
 		// SQLite
 		case "SQLite":
 			DSN = conf["DatabaseName"]
 			GoToolDBMap[k], err = gorm.Open(sqlite.Open(DSN), options)
 			if err != nil {
-				log.Println("✘ 连接库连接池 : " + k + " 初始化失败 ( " + err.Error() + " )")
+				log.Println("✘ SQLite连接库连接池 : " + k + " 初始化失败 ( " + err.Error() + " )")
 			} else {
-				log.Println("✔ 连接库连接池 : " + k + " 初始化成功 ")
+				log.Println("✔ SQLite连接库连接池 : " + k + " 初始化成功 ")
 			}
 		}
 		// 获取基础数据库操作接口
